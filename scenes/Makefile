@@ -1,17 +1,17 @@
 
-BLENDER=../../blender-2.80-linux-glibc217-x86_64/blender
+BLENDER=blender
 
-all : ../dist/brunch.pnct ../dist/brunch.scene ../dist/garden.pnct ../dist/garden.scene ../dist/city.pnct ../dist/city.scene #hexapod.pnct hexapod.scene
+all : ../dist/robot.pnct ../dist/robot.scene ../dist/garden.pnct ../dist/garden.scene ../dist/city.pnct ../dist/city.scene #hexapod.pnct hexapod.scene
 
 ../dist/city.pnct : city.blend export-meshes.py
 	$(BLENDER) --background --python export-meshes.py -- city.blend:Parts '$@'
 
 ../dist/city.scene : city.blend export-scene.py
 	$(BLENDER) --background --python export-scene.py -- city.blend:Scene '$@'
-../dist/brunch.pnct : brunch.blend export-meshes.py
-	$(BLENDER) --background --python export-meshes.py -- brunch.blend '$@'
-../dist/brunch.scene : brunch.blend export-scene.py
-	$(BLENDER) --background --python export-scene.py -- brunch.blend '$@'
+../dist/robot.pnct : robot.blend export-meshes.py
+	$(BLENDER) --background --python export-meshes.py -- robot.blend '$@'
+../dist/robot.scene : robot.blend export-scene.py
+	$(BLENDER) --background --python export-scene.py -- robot.blend '$@'
 
 ../dist/garden.pnct : garden.blend export-meshes.py
 	$(BLENDER) --background --python export-meshes.py -- garden.blend '$@'
