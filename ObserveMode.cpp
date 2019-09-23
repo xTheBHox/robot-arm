@@ -8,6 +8,7 @@
 #include "Sound.hpp"
 
 #include <iostream>
+#include <cmath>
 
 Load< Sound::Sample > noise(LoadTagDefault, []() -> Sound::Sample const * {
 	return new Sound::Sample(data_path("cold-dunes.opus"));
@@ -19,14 +20,14 @@ Load< SpriteAtlas > trade_font_atlas(LoadTagDefault, []() -> SpriteAtlas const *
 
 GLuint meshes_for_lit_color_texture_program = 0;
 static Load< MeshBuffer > meshes(LoadTagDefault, []() -> MeshBuffer const * {
-	MeshBuffer *ret = new MeshBuffer(data_path("city.pnct"));
+	MeshBuffer *ret = new MeshBuffer(data_path("garden.pnct"));
 	meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
 	return ret;
 });
 
 static Load< Scene > scene(LoadTagLate, []() -> Scene const * {
 	Scene *ret = new Scene();
-	ret->load(data_path("city.scene"), [](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
+	ret->load(data_path("garden.scene"), [](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
 		auto &mesh = meshes->lookup(mesh_name);
 		scene.drawables.emplace_back(transform);
 		Scene::Drawable::Pipeline &pipeline = scene.drawables.back().pipeline;
@@ -55,23 +56,34 @@ ObserveMode::~ObserveMode() {
 bool ObserveMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size) {
 	if (evt.type == SDL_KEYDOWN) {
 		if (evt.key.keysym.sym == SDLK_LEFT) {
-			auto ci = scene->cameras.begin();
-			while (ci != scene->cameras.end() && &*ci != current_camera) ++ci;
-			if (ci == scene->cameras.begin()) ci = scene->cameras.end();
-			--ci;
-			current_camera = &*ci;
-			return true;
+      float xi, yi, r, angle;
+      xi = current_camera->transform->position.x;
+      yi = current_camera->transform->position.y;
+      r = sqrt(xi * xi + yi * yi);
+      angle = atan2(yi, xi);
+      angle -= 0.05f;
+      current_camera->transform->position.x = r * cos(angle);
+      current_camera->transform->position.y = r * sin(angle);
+      //current_camera->transform->rotation.x = -current_camera->transform->position.x;
+      //current_camera->transform->rotation.y = -current_camera->transform->position.y;
+      //current_camera->transform->rotation.z = -current_camera->transform->position.z;
+      return true;
 		} else if (evt.key.keysym.sym == SDLK_RIGHT) {
-			auto ci = scene->cameras.begin();
-			while (ci != scene->cameras.end() && &*ci != current_camera) ++ci;
-			if (ci != scene->cameras.end()) ++ci;
-			if (ci == scene->cameras.end()) ci = scene->cameras.begin();
-			current_camera = &*ci;
-
+      float xi, yi, r, angle;
+      xi = current_camera->transform->position.x;
+      yi = current_camera->transform->position.y;
+      r = sqrt(xi * xi + yi * yi);
+      angle = atan2(yi, xi);
+      angle += 0.05f;
+      current_camera->transform->position.x = r * cos(angle);
+      current_camera->transform->position.y = r * sin(angle);
+      //current_camera->transform->rotation.x = -current_camera->transform->position.x;
+      //current_camera->transform->rotation.y = -current_camera->transform->position.y;
+      //current_camera->transform->rotation.z = -current_camera->transform->position.z;
 			return true;
 		}
 	}
-	
+
 	return false;
 }
 
