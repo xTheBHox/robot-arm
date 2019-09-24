@@ -1,7 +1,7 @@
 
 BLENDER=../../blender/blender
 
-all : ../dist/robot.pnct ../dist/robot.scene ../dist/garden.pnct ../dist/garden.scene ../dist/city.pnct ../dist/city.scene #hexapod.pnct hexapod.scene
+all : ../dist/robot.pnct ../dist/robot.scene 
 
 ../dist/city.pnct : city.blend export-meshes.py
 	$(BLENDER) --background --python export-meshes.py -- city.blend:Parts '$@'
