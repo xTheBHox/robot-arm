@@ -1,8 +1,8 @@
-# (TODO: your game's title)
+# Robot Arm
 
-Author: (TODO: your name)
+Author: Benjamin Huang
 
-Design: (TODO: In two sentences or fewer, describe what is new and interesting about your game.)
+Design: This is a game which demonstrates the need for inverse kinematics.
 
 Screen Shot:
 
@@ -10,10 +10,17 @@ Screen Shot:
 
 How To Play:
 
-(TODO: describe the controls and (if needed) goals/strategy.)
+Use the keyboard to control the robot arm. There are five pivots on the arm, and each pivot has full rotational freedom. Controls for each pivot come in sets of six keys.
+Pivot 1 (closest to base): QW (x-axis) | AS (y-axis) | ZX (z-axis)
+Pivot 2: ER | DF | CV 
+Pivot 3: TY | GH | BN 
+Pivot 4: UI | JK | M,
+Pivot 5: OP | L; | ./
+
+The camera views can be changed by using the Left/Right arrow keys.
 
 Sources:
 
-(TODO: fill in information about the sources of any **artwork** or **sounds** you used in the game that you did not create yourself. Feel free to also credit yourself for things you did make.)
+The robot arm created by myself in Blender. Heavy reference to tutorial by Christopher Yonge at https://www.youtube.com/watch?v=5ggUpJh4y6I
 
 This game was built with [NEST](NEST.md).

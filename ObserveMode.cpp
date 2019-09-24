@@ -94,33 +94,19 @@ bool ObserveMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_si
       return true;
     }
 		else if (evt.key.keysym.sym == SDLK_LEFT) {
-      float xi, yi, r, angle;
-      xi = current_camera->transform->position.x;
-      yi = current_camera->transform->position.y;
-      r = sqrt(xi * xi + yi * yi);
-      angle = atan2(yi, xi);
-      angle -= 0.05f;
-      current_camera->transform->position.x = r * cos(angle);
-      current_camera->transform->position.y = r * sin(angle);
-
-      glm::quat rot = glm::quat(cos(angle / 2.0f), 0.0f, 0.0f, sin(angle / 2.0f));
-      current_camera->transform->rotation = rot * current_camera->transform->rotation;
-
-      return true;
+			auto ci = scene->cameras.begin();
+			while (ci != scene->cameras.end() && &*ci != current_camera) ++ci;
+			if (ci == scene->cameras.begin()) ci = scene->cameras.end();
+			--ci;
+			current_camera = &*ci;
+			return true;
 		} else if (evt.key.keysym.sym == SDLK_RIGHT) {
-      float xi, yi, r, angle;
-      xi = current_camera->transform->position.x;
-      yi = current_camera->transform->position.y;
-      r = sqrt(xi * xi + yi * yi);
-      angle = atan2(yi, xi);
-      angle += 0.05f;
-      current_camera->transform->position.x = r * cos(angle);
-      current_camera->transform->position.y = r * sin(angle);
-
-      glm::quat rot = glm::quat(cos(angle / 2.0f), 0.0f, 0.0f, -sin(angle / 2.0f));
-      current_camera->transform->rotation = rot * current_camera->transform->rotation;
-
-      return true;
+			auto ci = scene->cameras.begin();
+			while (ci != scene->cameras.end() && &*ci != current_camera) ++ci;
+			if (ci != scene->cameras.end()) ++ci;
+			if (ci == scene->cameras.end()) ci = scene->cameras.begin();
+			current_camera = &*ci;
+			return true;
 		} else {
       auto it = ObserveModeSettings::key_mapping.find(evt.key.keysym.sym);
       if (it != ObserveModeSettings::key_mapping.end()) {
@@ -209,22 +195,35 @@ void ObserveMode::draw(glm::uvec2 const &drawable_size) {
 		glEnable(GL_BLEND);
 		glBlendEquation(GL_FUNC_ADD);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		DrawSprites draw(*trade_font_atlas, glm::vec2(0,0), drawable_size, drawable_size, DrawSprites::AlignPixelPerfect);
+
+    float scale = 0.5f;
+    glm::vec2 font_scale(drawable_size.x * scale, drawable_size.y * scale);
+		DrawSprites draw(*trade_font_atlas, glm::vec2(0,0), font_scale, drawable_size, DrawSprites::AlignPixelPerfect);
 
     glm::vec2 min, max;
-    float x, y;
+    float x, y, margin = 20.0f * scale;
 
-    std::string time_text = std::to_string(static_cast<int>(score_elapsed));
-		draw.get_text_extents(time_text, glm::vec2(0.0f, 0.0f), 1.0f, &min, &max);
-		x = std::round(drawable_size.x - 20.0f - (max.x - min.x));
-    y = 20.0f;
-		draw.draw_text(time_text, glm::vec2(x, y), 1.0f, glm::u8vec4(0x00,0x00,0x00,0xff));
-		draw.draw_text(time_text, glm::vec2(x, y), 1.0f, glm::u8vec4(0xff,0x00,0x00,0xff));
+
+    if (!targets.empty()) {
+      std::string time_text = std::to_string(static_cast<int>(score_elapsed));
+  		draw.get_text_extents(time_text, glm::vec2(0.0f, 0.0f), 1.0f, &min, &max);
+  		x = std::round(font_scale.x - margin - (max.x - min.x));
+      y = margin;
+  		draw.draw_text(time_text, glm::vec2(x, y), 1.0f, glm::u8vec4(0x00,0x00,0x00,0xff));
+  		draw.draw_text(time_text, glm::vec2(x, y), 1.0f, glm::u8vec4(0xff,0x00,0x00,0xff));
+    } else {
+      std::string time_text = "Time taken: " + std::to_string(static_cast<int>(score_elapsed));
+  		draw.get_text_extents(time_text, glm::vec2(0.0f, 0.0f), 1.0f, &min, &max);
+  		x = std::round(0.5f * (font_scale.x - (max.x - min.x)));
+      y = std::round(0.25f * font_scale.y - 0.5f * (max.y - min.y));
+  		draw.draw_text(time_text, glm::vec2(x, y), 1.0f, glm::u8vec4(0x00,0x00,0x00,0xff));
+  		draw.draw_text(time_text, glm::vec2(x, y), 1.0f, glm::u8vec4(0xff,0x00,0x00,0xff));
+    }
 
     std::string remain_text = "Targets left: " + std::to_string(targets.size());
 		draw.get_text_extents(remain_text, glm::vec2(0.0f, 0.0f), 1.0f, &min, &max);
-		x = std::round(drawable_size.x - 20.0f - (max.x - min.x));
-    y = std::round(drawable_size.y - 20.0f - (max.y - min.y));
+		x = std::round(font_scale.x - margin - (max.x - min.x));
+    y = std::round(font_scale.y - margin - (max.y - min.y));
 		draw.draw_text(remain_text, glm::vec2(x, y), 1.0f, glm::u8vec4(0x00,0x00,0x00,0xff));
 		draw.draw_text(remain_text, glm::vec2(x, y), 1.0f, glm::u8vec4(0xff,0x00,0x00,0xff));
 
