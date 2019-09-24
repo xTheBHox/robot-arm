@@ -20,14 +20,14 @@ Load< SpriteAtlas > trade_font_atlas(LoadTagDefault, []() -> SpriteAtlas const *
 
 GLuint meshes_for_lit_color_texture_program = 0;
 static Load< MeshBuffer > meshes(LoadTagDefault, []() -> MeshBuffer const * {
-	MeshBuffer *ret = new MeshBuffer(data_path("garden.pnct"));
+	MeshBuffer *ret = new MeshBuffer(data_path("robot.pnct"));
 	meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
 	return ret;
 });
 
 static Load< Scene > scene(LoadTagLate, []() -> Scene const * {
 	Scene *ret = new Scene();
-	ret->load(data_path("garden.scene"), [](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
+	ret->load(data_path("robot.scene"), [](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
 		auto &mesh = meshes->lookup(mesh_name);
 		scene.drawables.emplace_back(transform);
 		Scene::Drawable::Pipeline &pipeline = scene.drawables.back().pipeline;
@@ -46,16 +46,36 @@ ObserveMode::ObserveMode() {
 
 	current_camera = &scene->cameras.front();
 
-	noise_loop = Sound::loop_3D(*noise, 1.0f, glm::vec3(0.0f, 0.0f, 0.0f), 10.0f);
+  for (const char *c : Settings::names_pivots) {
+    // find the transform in the scene
+    for (Scene::Transform *t : scene->transforms) {
+      if (t->name == c) {
+        pivots.emplace_back(t);
+        break;
+      }
+    }
+  }
+
 }
 
 ObserveMode::~ObserveMode() {
-	noise_loop->stop();
+
 }
 
 bool ObserveMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size) {
 	if (evt.type == SDL_KEYDOWN) {
-		if (evt.key.keysym.sym == SDLK_LEFT) {
+		if (evt.key.keysym.sym == SDLK_SPACE) {
+      int i = 0;
+      for (const Scene::Drawable &d : scene->drawables) {
+        std::cout << "Drawable " << i << std::endl;
+        std::cout << d.transform->name << std::endl;
+        glm::vec3 pos = d.transform->position;
+        std::cout << pos.x << " " << pos.y << " " << pos.z << std::endl;
+        i++;
+      }
+      return true;
+    }
+		else if (evt.key.keysym.sym == SDLK_LEFT) {
       float xi, yi, r, angle;
       xi = current_camera->transform->position.x;
       yi = current_camera->transform->position.y;
@@ -81,28 +101,46 @@ bool ObserveMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_si
       //current_camera->transform->rotation.y = -current_camera->transform->position.y;
       //current_camera->transform->rotation.z = -current_camera->transform->position.z;
 			return true;
-		}
+		} else {
+      auto it = Settings::key_mapping.find(evt.key.keysym.sym);
+      if (it != Settings::key_mapping.end()) {
+        Scene::Transform *t = pivots[it->second.index];
+        glm::quat rot;
+        switch (it->second.axis) {
+          case Settings::PivotAxis::XP: {
+            
+            break;
+          }
+          case Settings::PivotAxis::XN: {
+
+            break;
+          }
+          case Settings::PivotAxis::YP: {
+
+            break;
+          }
+          case Settings::PivotAxis::YN: {
+
+            break;
+          }
+          case Settings::PivotAxis::ZP: {
+
+            break;
+          }
+          case Settings::PivotAxis::ZN: {
+
+            break;
+          }
+        }
+      }
+    }
 	}
 
 	return false;
 }
 
 void ObserveMode::update(float elapsed) {
-	noise_angle = std::fmod(noise_angle + elapsed, 2.0f * 3.1415926f);
 
-	//update sound position:
-	glm::vec3 center = glm::vec3(10.0f, 4.0f, 1.0f);
-	float radius = 10.0f;
-	noise_loop->set_position(center + radius * glm::vec3( std::cos(noise_angle), std::sin(noise_angle), 0.0f));
-
-	//update listener position:
-	glm::mat4 frame = current_camera->transform->make_local_to_world();
-
-	//using the sound lock here because I want to update position and right-direction *simultaneously* for the audio code:
-	Sound::lock();
-	Sound::listener.set_position(frame[3]);
-	Sound::listener.set_right(frame[0]);
-	Sound::unlock();
 }
 
 void ObserveMode::draw(glm::uvec2 const &drawable_size) {
