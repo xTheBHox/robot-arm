@@ -10,10 +10,6 @@
 #include <iostream>
 #include <cmath>
 
-Load< Sound::Sample > noise(LoadTagDefault, []() -> Sound::Sample const * {
-	return new Sound::Sample(data_path("cold-dunes.opus"));
-});
-
 Load< SpriteAtlas > trade_font_atlas(LoadTagDefault, []() -> SpriteAtlas const * {
 	return new SpriteAtlas(data_path("trade-font"));
 });
@@ -24,6 +20,8 @@ static Load< MeshBuffer > meshes(LoadTagDefault, []() -> MeshBuffer const * {
 	meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
 	return ret;
 });
+
+static Scene *scene_ptr = nullptr;
 
 static Load< Scene > scene(LoadTagLate, []() -> Scene const * {
 	Scene *ret = new Scene();
@@ -38,21 +36,41 @@ static Load< Scene > scene(LoadTagLate, []() -> Scene const * {
 		pipeline.start = mesh.start;
 		pipeline.count = mesh.count;
 	});
+  scene_ptr = ret;
 	return ret;
 });
 
 ObserveMode::ObserveMode() {
+
 	assert(scene->cameras.size() && "Observe requires cameras.");
 
 	current_camera = &scene->cameras.front();
 
-  for (const char *c : Settings::names_pivots) {
+  for (const char *c : ObserveModeSettings::names_pivots) {
     // find the transform in the scene
-    for (Scene::Transform *t : scene->transforms) {
-      if (t->name == c) {
-        pivots.emplace_back(t);
+    for (auto it = scene_ptr->transforms.begin(); it != scene->transforms.end(); it++) {
+      if (it->name == c) {
+        pivots.push_back(&(*it));
+        avels.emplace_back(0.0f, 0.0f, 0.0f);
         break;
       }
+    }
+  }
+
+  for (const char *c : ObserveModeSettings::names_targets) {
+    // find the transform in the scene
+    for (auto it = scene_ptr->transforms.begin(); it != scene->transforms.end(); it++) {
+      if (it->name == c) {
+        targets.push_back(&(*it));
+        break;
+      }
+    }
+  }
+
+  for (auto it = scene_ptr->transforms.begin(); it != scene->transforms.end(); it++) {
+    if (it->name == ObserveModeSettings::name_point) {
+      pointer = (&(*it));
+      break;
     }
   }
 
@@ -84,9 +102,10 @@ bool ObserveMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_si
       angle -= 0.05f;
       current_camera->transform->position.x = r * cos(angle);
       current_camera->transform->position.y = r * sin(angle);
-      //current_camera->transform->rotation.x = -current_camera->transform->position.x;
-      //current_camera->transform->rotation.y = -current_camera->transform->position.y;
-      //current_camera->transform->rotation.z = -current_camera->transform->position.z;
+
+      glm::quat rot = glm::quat(cos(angle / 2.0f), 0.0f, 0.0f, sin(angle / 2.0f));
+      current_camera->transform->rotation = rot * current_camera->transform->rotation;
+
       return true;
 		} else if (evt.key.keysym.sym == SDLK_RIGHT) {
       float xi, yi, r, angle;
@@ -97,38 +116,37 @@ bool ObserveMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_si
       angle += 0.05f;
       current_camera->transform->position.x = r * cos(angle);
       current_camera->transform->position.y = r * sin(angle);
-      //current_camera->transform->rotation.x = -current_camera->transform->position.x;
-      //current_camera->transform->rotation.y = -current_camera->transform->position.y;
-      //current_camera->transform->rotation.z = -current_camera->transform->position.z;
-			return true;
+
+      glm::quat rot = glm::quat(cos(angle / 2.0f), 0.0f, 0.0f, -sin(angle / 2.0f));
+      current_camera->transform->rotation = rot * current_camera->transform->rotation;
+
+      return true;
 		} else {
-      auto it = Settings::key_mapping.find(evt.key.keysym.sym);
-      if (it != Settings::key_mapping.end()) {
-        Scene::Transform *t = pivots[it->second.index];
-        glm::quat rot;
+      auto it = ObserveModeSettings::key_mapping.find(evt.key.keysym.sym);
+      if (it != ObserveModeSettings::key_mapping.end()) {
         switch (it->second.axis) {
-          case Settings::PivotAxis::XP: {
-            
+          case ObserveModeSettings::PivotAxis::XP: {
+            avels[it->second.index].x += ObserveModeSettings::rotation_accel;
             break;
           }
-          case Settings::PivotAxis::XN: {
-
+          case ObserveModeSettings::PivotAxis::XN: {
+            avels[it->second.index].x -= ObserveModeSettings::rotation_accel;
             break;
           }
-          case Settings::PivotAxis::YP: {
-
+          case ObserveModeSettings::PivotAxis::YP: {
+            avels[it->second.index].y += ObserveModeSettings::rotation_accel;
             break;
           }
-          case Settings::PivotAxis::YN: {
-
+          case ObserveModeSettings::PivotAxis::YN: {
+            avels[it->second.index].y -= ObserveModeSettings::rotation_accel;
             break;
           }
-          case Settings::PivotAxis::ZP: {
-
+          case ObserveModeSettings::PivotAxis::ZP: {
+            avels[it->second.index].z += ObserveModeSettings::rotation_accel;
             break;
           }
-          case Settings::PivotAxis::ZN: {
-
+          case ObserveModeSettings::PivotAxis::ZN: {
+            avels[it->second.index].z -= ObserveModeSettings::rotation_accel;
             break;
           }
         }
@@ -141,7 +159,38 @@ bool ObserveMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_si
 
 void ObserveMode::update(float elapsed) {
 
+  if (!targets.empty()) score_elapsed += elapsed;
+
+  // update friction, position
+  for (uint32_t i = 0; i < pivots.size(); i++) {
+
+    avels[i] *= ObserveModeSettings::friction;
+    glm::quat rot = glm::quat(cos(avels[i].x), sin(avels[i].x), 0.0f, 0.0f);
+    rot = glm::quat(cos(avels[i].y), 0.0f, sin(avels[i].y), 0.0f) * rot;
+    rot = glm::quat(cos(avels[i].z), 0.0f, 0.0f, sin(avels[i].z)) * rot;
+    pivots[i]->rotation = rot * pivots[i]->rotation;
+
+  }
+
+  // collision detection
+  glm::vec4 pt_pos = pointer->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+  auto it = targets.begin();
+  for (; it != targets.end(); it++) {
+    Scene::Transform *t = *it;
+    glm::vec4 tgt_pos = t->make_local_to_world() * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    glm::vec4 dist = tgt_pos - pt_pos;
+    float r2 = dist.x * dist.x + dist.y * dist.y + dist.z * dist.z;
+    if (r2 < 1.0f) {
+      (*it)->scale = glm::vec3(0.01f, 0.01f, 0.01f);
+      break;
+    }
+  }
+  if (it != targets.end()) {
+    targets.erase(it);
+    std::cout << "Hit target!" << std::endl;
+  }
 }
+
 
 void ObserveMode::draw(glm::uvec2 const &drawable_size) {
 	//--- actual drawing ---
@@ -160,13 +209,24 @@ void ObserveMode::draw(glm::uvec2 const &drawable_size) {
 		glEnable(GL_BLEND);
 		glBlendEquation(GL_FUNC_ADD);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		DrawSprites draw(*trade_font_atlas, glm::vec2(0,0), glm::vec2(320, 200), drawable_size, DrawSprites::AlignPixelPerfect);
+		DrawSprites draw(*trade_font_atlas, glm::vec2(0,0), drawable_size, drawable_size, DrawSprites::AlignPixelPerfect);
 
-		std::string help_text = "--- SWITCH CAMERAS WITH LEFT/RIGHT ---";
-		glm::vec2 min, max;
-		draw.get_text_extents(help_text, glm::vec2(0.0f, 0.0f), 1.0f, &min, &max);
-		float x = std::round(160.0f - (0.5f * (max.x + min.x)));
-		draw.draw_text(help_text, glm::vec2(x, 1.0f), 1.0f, glm::u8vec4(0x00,0x00,0x00,0xff));
-		draw.draw_text(help_text, glm::vec2(x, 2.0f), 1.0f, glm::u8vec4(0xff,0xff,0xff,0xff));
+    glm::vec2 min, max;
+    float x, y;
+
+    std::string time_text = std::to_string(static_cast<int>(score_elapsed));
+		draw.get_text_extents(time_text, glm::vec2(0.0f, 0.0f), 1.0f, &min, &max);
+		x = std::round(drawable_size.x - 20.0f - (max.x - min.x));
+    y = 20.0f;
+		draw.draw_text(time_text, glm::vec2(x, y), 1.0f, glm::u8vec4(0x00,0x00,0x00,0xff));
+		draw.draw_text(time_text, glm::vec2(x, y), 1.0f, glm::u8vec4(0xff,0x00,0x00,0xff));
+
+    std::string remain_text = "Targets left: " + std::to_string(targets.size());
+		draw.get_text_extents(remain_text, glm::vec2(0.0f, 0.0f), 1.0f, &min, &max);
+		x = std::round(drawable_size.x - 20.0f - (max.x - min.x));
+    y = std::round(drawable_size.y - 20.0f - (max.y - min.y));
+		draw.draw_text(remain_text, glm::vec2(x, y), 1.0f, glm::u8vec4(0x00,0x00,0x00,0xff));
+		draw.draw_text(remain_text, glm::vec2(x, y), 1.0f, glm::u8vec4(0xff,0x00,0x00,0xff));
+
 	}
 }
